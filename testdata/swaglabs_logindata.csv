@@ -1,0 +1,3 @@
+testName,email,password,expected
+Valid login,standard_user,secret_sauce,success
+Invalid login,locked_out_user,secret_sauce,failure

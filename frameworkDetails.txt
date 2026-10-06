@@ -1,0 +1,357 @@
+================================================================================
+PLAYWRIGHT + TYPESCRIPT TEST AUTOMATION FRAMEWORK — SWAGLABS
+Complete Step-by-Step Explanation (Interview Guide)
+================================================================================
+
+This document explains the automation framework end to end: what it is, how it
+is structured, and exactly how a test flows from the test file all the way down
+to the browser and the final report. Use it as talking points for an interview.
+
+Application under test: https://www.saucedemo.com/ (SwagLabs demo store)
+
+================================================================================
+1. WHAT THE FRAMEWORK IS (Overview)
+================================================================================
+
+This is a Playwright + TypeScript test automation framework built to test Web UI,
+REST API, and Database layers in one project. It is designed around three
+industry-standard principles:
+
+  - Page Object Model (POM)        -> UI logic lives in page classes, not in tests
+  - Custom Fixtures                -> tests get pre-built page objects injected
+  - Data / Config externalization  -> URLs, credentials, and test data live in
+                                      .env and testdata/ files, never hard-coded
+
+The framework is deterministic and repeatable: the same input always produces the
+same structure and the same test. It is written to be AI-agent friendly (a
+central context file drives how tests, pages, fixtures, and utilities are
+generated), but the result is ordinary, maintainable Playwright code.
+
+================================================================================
+2. TECHNOLOGY STACK (Dependencies)
+================================================================================
+
+  Language / Runner:
+    - TypeScript (strict mode)       -> type safety, catches mistakes early
+    - @playwright/test               -> test runner, assertions, fixtures, requests
+
+  Test Data & Utilities:
+    - @faker-js/faker                -> generates realistic random data (names, emails)
+    - dotenv                         -> loads .env config values into process.env
+    - csv-parse + xlsx               -> read CSV / Excel test-data files
+    - ajv                            -> JSON-schema validation for API responses
+    - luxon                          -> date/time handling
+    - mysql2                         -> connect and query a MySQL database
+
+  Quality & Reporting:
+    - @axe-core/playwright           -> accessibility (WCAG) checks
+    - allure-playwright              -> Allure report
+    - @types/node                    -> Node.js TypeScript definitions
+
+================================================================================
+3. FOLDER STRUCTURE (Directory Tree)
+================================================================================
+
+  P9_Playwright_AI_Framework_SwagLabs/
+  |
+  |-- .env                          # URLs, credentials, product details (NOT committed)
+  |-- .env_example                  # safe template of .env with placeholder values
+  |-- .gitignore                    # excludes node_modules, reports, .env
+  |-- env_setup.bat                 # one-click install of all dependencies
+  |-- playwright.config.ts          # Playwright runner configuration
+  |-- tsconfig.json                 # TypeScript compiler configuration
+  |-- package.json                  # dependencies and npm scripts
+  |-- playwright-mcp-context.md     # the "single source of truth" conventions doc
+  |
+  |-- pages/                        # Page Object classes (one class per page)
+  |-- fixtures/                     # custom fixtures that expose page objects
+  |-- tests/
+  |     |-- web/                    # UI tests (use custom page fixtures)
+  |     |-- api/                    # REST API tests (use Playwright request fixture)
+  |     |-- db/                     # database tests (use the DB client utility)
+  |-- testdata/                     # external test data (JSON / CSV / XLSX)
+  |-- api/
+  |     |-- endpoints/routes.ts     # centralized API endpoint URL constants
+  |     |-- schemas/                # JSON schemas for API response validation
+  |-- utils/                        # reusable helpers (data, reading, DB, reporting)
+  |-- prompts/                      # test-scenario prompt files (generation drivers)
+  |-- reports/                      # Playwright HTML report output
+  |-- custom-report/                # custom HTML report output
+  |-- test-results/                 # raw test artifacts (traces, videos, screenshots)
+
+================================================================================
+4. ARCHITECTURE & DESIGN PATTERNS
+================================================================================
+
+4.1 Page Object Model (POM)
+  - Every web page has a matching class under pages/ (e.g. LoginPage, CartPage).
+  - Locators and page actions live inside the class, NOT inside the test.
+  - This makes tests readable and easy to maintain: if a locator changes, you fix
+    it in one place (the page object), not in every test.
+
+4.2 Custom Fixtures
+  - The framework does NOT let a test create page objects manually.
+  - fixtures/pageFixtures.ts uses Playwright's base.extend() to inject ready-to-use
+    page objects into every test, e.g.:
+
+        test('...', async ({ loginPage, cartPage }) => { ... })
+
+  - The entry fixture (homePage) also performs the navigation to WEB_APP_URL, so
+    every test starts on the application home page automatically.
+
+4.3 Three-Layer Separation (Web / API / DB)
+  - Web testing      -> pages -> fixtures -> web tests
+  - API testing      -> routes -> schemas -> utilities -> api tests
+  - DB testing       -> db config -> db client -> queries -> db tests
+  - These layers stay logically separate; an end-to-end scenario can combine them
+    without mixing the implementation (each layer lives in its own test.step).
+
+================================================================================
+5. CONFIGURATION FILES
+================================================================================
+
+5.1 playwright.config.ts
+  - timeout: 180 seconds per test
+  - testDir: ./tests
+  - fullyParallel: true
+  - retries: 2 in CI, 0 locally
+  - workers: 1 in CI, auto locally
+  - reporters: list (console), html (reports/), junit (results.xml),
+    custom reporter (utils/CustomReporter.ts), allure (allure-results/)
+  - trace: on-first-retry, screenshot: only-on-failure, video: retain-on-failure
+  - headless: false locally, true in CI
+  - viewport: 1280x720, ignoreHTTPSErrors: true
+  - grep: /@master/   <-- only tests tagged @master run by default
+  - projects: chromium (Desktop Chrome)
+
+5.2 tsconfig.json
+  - target ES2022, module Node16, strict: true, esModuleInterop, skipLibCheck
+
+5.3 .env (key values for this project)
+  - WEB_APP_URL   = https://www.saucedemo.com/
+  - APP_EMAIL     = standard_user
+  - APP_PASSWORD  = secret_sauce
+  - PRODUCT_NAME  = Sauce Labs Fleece Jacket
+  - TOTAL_PRICE   = $49.99
+  - API_BASE_URL  = https://fakestoreapi.com
+  - DB_HOST / DB_USER / DB_PASSWORD / DB_NAME / DB_PORT
+
+  Rule: secrets and environment-specific values are read from .env (via dotenv),
+  never hard-coded in test or utility code. The real .env stays in .gitignore.
+
+================================================================================
+6. PAGE OBJECTS (pages/ directory)
+================================================================================
+
+Each class follows the same pattern:
+  - private readonly page: Page
+  - // Locators section (private readonly Locator fields)
+  - constructor initializes locators using Playwright's built-in selectors
+  - methods return Promise<void> (action), Promise<boolean> (existence check),
+    or the next page object when the action navigates to another page.
+
+SwagLabs uses data-test attributes, so locators use [data-test="..."].
+
+  LoginPage              -> username, password, login button; login() returns ProductsPage
+  ProductsPage           -> verifies "Products" title; clickProduct() opens details
+  ProductDetailsPage     -> verifies product name; add-to-cart; open cart
+  CartPage               -> verifies "Your Cart"; reads item name/price; checkout
+  CheckoutPage           -> first name, last name, zip; continue -> overview
+  CheckoutOverviewPage   -> verifies "Checkout: Overview"; item total + total; finish
+  CheckoutCompletePage   -> verifies "Checkout: Complete!"; "Thank you for your order!"
+
+================================================================================
+7. CUSTOM FIXTURES (fixtures/pageFixtures.ts)
+================================================================================
+
+  - Loads dotenv and reads WEB_APP_URL.
+  - Defines a PageFixtures type that maps each fixture name to its page class.
+  - homePage fixture navigates to the app URL (page.goto), then hands back LoginPage.
+  - Every other fixture just returns a new instance of its page class.
+  - test.afterEach closes the page after each test.
+  - Re-exports expect at the bottom so tests import everything from one place:
+
+        import { test, expect } from '../../fixtures/pageFixtures';
+
+  Available fixtures: homePage, loginPage, productsPage, productDetailsPage,
+                      cartPage, checkoutPage, checkoutOverviewPage, checkoutCompletePage
+
+================================================================================
+8. UTILITIES (utils/ directory)
+================================================================================
+
+  helper.ts (class Helper)
+    - convertPriceToNumber(price) -> strips non-numeric chars, returns a number
+    - getProductDetails()         -> product name/quantity/price (from .env)
+    - getLoginDetails()           -> username/password (from .env)
+
+  dataGenerator.ts (class RandomDataUtil)
+    - Faker-backed random data: first/last name, email, phone, address, zip, dates,
+      product name/price, and payload builders for API create/update requests.
+
+  DataReader.ts (class DataProvider)
+    - readJson(filePath)  -> parse a JSON file
+    - readCsv(filePath)   -> parse a CSV file (columns: true)
+    - readExcel(filePath) -> parse an XLSX workbook (first sheet)
+
+  dbClient.ts (function executeQuery)
+    - Connects to MySQL via mysql2/promise using DB_* env values, executes a
+      parameterized query, closes the connection, and returns the result.
+
+  CustomReporter.ts
+    - A custom Playwright Reporter that produces a rich, self-contained HTML report
+      with dashboard charts (status, severity, duration, duration trend), test
+      steps, screenshots, videos, and traces.
+
+================================================================================
+9. TEST DATA & DATA-DRIVEN APPROACH
+================================================================================
+
+  - testdata/ holds swaglabs_logindata.json, .csv, and .xlsx.
+  - Each row contains: testName, email (username), password, expected (success/failure).
+  - For data-driven tests, the spec loads the file via DataProvider and loops over
+    rows, generating one independent test per row (tagged @datadriven).
+  - This keeps test input out of the code and makes it easy to add/remove cases.
+
+================================================================================
+10. API LAYER (api/ directory)
+================================================================================
+
+  - api/endpoints/routes.ts -> a central Routes object holding all endpoint URL
+    constants (e.g. GET_ALL_PRODUCTS, GET_PRODUCT_BY_ID, CREATE_PRODUCT, etc.)
+    with {placeholder} style for dynamic segments.
+  - api/schemas/ -> JSON schemas (product, cart, user) used with AJV to validate
+    API response structure.
+  - API tests live in tests/api/ and use Playwright's request fixture (not the page
+    fixtures), validate status codes, response bodies, and schemas.
+
+================================================================================
+11. DATABASE LAYER (tests/db/)
+================================================================================
+
+  - Uses dbClient.executeQuery(sql, params) so no test writes its own connection code.
+  - Connection details come from .env (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME).
+  - Tests insert data, validate it via queries, and delete it afterwards so tests
+    stay repeatable.
+
+================================================================================
+12. THE END-TO-END TEST — A COMPLETE WALKTHROUGH
+================================================================================
+
+File: tests/web/end-to-end-shopping-flow.spec.ts
+Tag:  @master @sanity @regression @end-to-end @web
+
+This one test covers the full customer shopping journey. It imports test + expect
+from the custom fixtures and gets its data from Helper and RandomDataUtil:
+
+  const { email, password } = Helper.getLoginDetails();        // standard_user / secret_sauce
+  const { productName, totalPrice } = Helper.getProductDetails(); // Fleece Jacket / $49.99
+  const firstName = RandomDataUtil.getFirstName();
+  const lastName  = RandomDataUtil.getLastName();
+  const zipCode   = RandomDataUtil.getZipCode();
+
+The flow, wrapped in test.step() blocks so each step shows up in the report:
+
+  1) Open the application          -> homePage fixture navigates to WEB_APP_URL;
+                                      assert the login page is displayed
+  2) Enter valid username/password -> loginPage.login(email, password)
+  3) Verify successful auth        -> assert the Products page title is visible
+  4) Select a known product        -> productsPage.clickProduct(productName)
+  5) Open the product details page -> assert the product name matches
+  6) Add the product to the cart   -> productDetailsPage.clickAddToCart()
+  7) Open the shopping cart        -> productDetailsPage.clickCart()
+  8) Verify the correct product    -> assert cart item name === productName
+  9) Verify the product price      -> assert cart item price === $49.99
+  10) Verify the applicable cart total -> assert the cart item price equals totalPrice
+  11) Click Checkout               -> cartPage.clickCheckout()
+  12) Enter First/Last/Zip         -> checkoutPage.fillCheckoutInformation(...)
+  13) Click Continue               -> assert the overview page is displayed
+  14) Check Overview details       -> assert item name, item total, and grand total
+  15) Click Finish                 -> checkoutOverviewPage.clickFinish()
+  16) Verify no errors             -> assert "Checkout: Complete!" and
+                                      "Thank you for your order!"
+
+Why it is clean:
+  - The test contains NO locators and NO direct page interaction code.
+  - Every page action is delegated to a page object.
+  - Assertions use Playwright's expect() with web-first auto-waiting.
+  - There are no hard-coded waits (no waitForTimeout / Thread.sleep).
+
+================================================================================
+13. TAGGING & EXECUTION
+================================================================================
+
+  Tags live inside the test title, e.g. test('... @master @sanity @web').
+  The config default grep is /@master/, so only @master tests run by default.
+
+  Common tags:
+    @master      -> core/default suite
+    @sanity      -> critical smoke tests
+    @regression  -> full regression
+    @end-to-end  -> full user journeys
+    @datadriven  -> data-driven tests
+    @api / @db   -> API / database tests
+
+  Example commands:
+    npx playwright test                                  -> run @master tests
+    npx playwright test --grep @sanity                   -> run only @sanity
+    npx playwright test --grep @end-to-end               -> run only E2E
+    npx playwright test tests/web/end-to-end-shopping-flow.spec.ts
+
+================================================================================
+14. REPORTING
+================================================================================
+
+  Four reporting outputs are produced on every run:
+
+  1. Console list reporter     -> immediate pass/fail output
+  2. Playwright HTML report    -> reports/ (interactive, with steps + errors)
+  3. JUnit XML                 -> reports/results.xml (for CI integration)
+  4. Custom HTML report        -> custom-report/ (dashboard charts, steps, media)
+  5. Allure results            -> allure-results/ (generate + open with Allure)
+
+  Failure artifacts (traces, screenshots, videos) are captured automatically and
+  help debug failures without re-running manually.
+
+================================================================================
+15. CI/CD & INFRASTRUCTURE (Planned / Documented)
+================================================================================
+
+  GitHub Actions   -> .github/workflows/playwright.yml runs the suite on push/PR,
+                      lets you pick suite, browser, and mode, then uploads reports.
+  Docker           -> a Dockerfile (based on the Playwright image), docker-compose.yml,
+                      and an entrypoint script run the suite in a portable container.
+  Jenkins          -> a Jenkinsfile (Windows and Mac variants) runs the suite with
+                      parameters and publishes JUnit + Allure + HTML reports.
+
+  In CI mode (CI=1), the config automatically becomes headless with 1 worker and
+  2 retries, which is the standard pattern for stable CI runs.
+
+================================================================================
+16. KEY PLAYWRIGHT CONCEPTS TO MENTION IN AN INTERVIEW
+================================================================================
+
+  - Web-first assertions: expect(locator).toBeVisible() auto-waits for the element.
+  - Auto-waiting: Playwright waits for elements to be actionable before acting.
+  - Built-in locators: getByRole/getByText/getByLabel/getByPlaceholder and
+    attribute selectors (this project uses data-test attributes).
+  - Fixtures: dependency-injected setup/teardown shared across tests.
+  - APIRequestContext: the request fixture does REST testing in the same runner.
+  - Tracing: on-first-retry captures a full trace to replay failures.
+  - Projects: run the same tests against chromium / firefox / webkit.
+
+================================================================================
+17. SUMMARY (Elevator Pitch)
+================================================================================
+
+  "This is a Playwright + TypeScript automation framework for the SwagLabs demo
+  store. It uses the Page Object Model to keep UI interaction out of tests, custom
+  fixtures to inject ready-made page objects, and a layered structure so Web, API,
+  and DB testing stay cleanly separated. Configuration and credentials are
+  externalized to .env, test data lives in JSON/CSV/Excel files, and every run
+  produces console, HTML, JUnit, Allure, and a custom HTML report. A single
+  end-to-end test walks the full customer journey — login, select a product, add
+  to cart, checkout, and verify completion — with no hard-coded waits and
+  deterministic, readable steps."
+
+================================================================================
