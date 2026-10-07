@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { ProductsPage } from './ProductsPage';
 
 export class LoginPage {
@@ -26,7 +26,8 @@ export class LoginPage {
      */
     async isLoginPageExists(): Promise<boolean> {
         try {
-            return await this.btnLogin.isVisible();
+            await expect(this.btnLogin).toBeVisible({ timeout: 15000 });
+            return true;
         } catch (error) {
             console.log(`Error checking login page: ${error}`);
             return false;

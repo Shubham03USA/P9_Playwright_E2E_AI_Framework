@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { CartPage } from './CartPage';
 
 export class ProductDetailsPage {
@@ -27,7 +27,8 @@ export class ProductDetailsPage {
      */
     async isProductDetailsVisible(productName: string): Promise<boolean> {
         try {
-            return (await this.lblProductName.textContent())?.trim() === productName;
+            await expect(this.lblProductName).toHaveText(productName, { timeout: 15000 });
+            return true;
         } catch (error) {
             console.log(`Error checking product details: ${error}`);
             return false;

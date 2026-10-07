@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 export class CheckoutCompletePage {
     private readonly page: Page;
@@ -21,8 +21,8 @@ export class CheckoutCompletePage {
      */
     async isCheckoutCompletePageExists(): Promise<boolean> {
         try {
-            await this.lblTitle.waitFor({ state: 'visible' });
-            return (await this.lblTitle.textContent())?.trim() === 'Checkout: Complete!';
+            await expect(this.lblTitle).toHaveText('Checkout: Complete!', { timeout: 15000 });
+            return true;
         } catch (error) {
             console.log(`Error checking checkout complete page: ${error}`);
             return false;

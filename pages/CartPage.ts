@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { CheckoutPage } from './CheckoutPage';
 
 export class CartPage {
@@ -26,8 +26,8 @@ export class CartPage {
      */
     async isCartPageExists(): Promise<boolean> {
         try {
-            await this.lblTitle.waitFor({ state: 'visible' });
-            return (await this.lblTitle.textContent())?.trim() === 'Your Cart';
+            await expect(this.lblTitle).toHaveText('Your Cart', { timeout: 15000 });
+            return true;
         } catch (error) {
             console.log(`Error checking cart page: ${error}`);
             return false;

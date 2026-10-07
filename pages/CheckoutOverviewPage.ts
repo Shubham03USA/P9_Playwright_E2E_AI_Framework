@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { CheckoutCompletePage } from './CheckoutCompletePage';
 
 export class CheckoutOverviewPage {
@@ -28,8 +28,8 @@ export class CheckoutOverviewPage {
      */
     async isOverviewPageExists(): Promise<boolean> {
         try {
-            await this.lblTitle.waitFor({ state: 'visible' });
-            return (await this.lblTitle.textContent())?.trim() === 'Checkout: Overview';
+            await expect(this.lblTitle).toHaveText('Checkout: Overview', { timeout: 15000 });
+            return true;
         } catch (error) {
             console.log(`Error checking overview page: ${error}`);
             return false;
