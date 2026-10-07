@@ -14,8 +14,8 @@ export class ProductDetailsPage {
         this.page = page;
 
         // Initialize locators with CSS selectors
-        this.lblProductName = page.locator('[data-test="inventory-item-name"]');
-        this.lblProductPrice = page.locator('[data-test="inventory-item-price"]');
+        this.lblProductName = page.locator('.inventory_details_name');
+        this.lblProductPrice = page.locator('.inventory_details_price');
         this.btnAddToCart = page.locator('[data-test="add-to-cart"]');
         this.lnkCart = page.locator('[data-test="shopping-cart-link"]');
     }
